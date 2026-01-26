@@ -43,7 +43,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(BASE_DIR, "..", "Modelo", "modelo_lstm.h5")
 scaler_path = os.path.join(BASE_DIR, "..", "Modelo", "scaler.pkl")
 
-model = load_model(model_path, custom_objects={"mse": MeanSquaredError()})
+model = load_model(model_path, custom_objects={"mse": MeanSquaredError()}, compile=False)
 scaler = joblib.load(scaler_path)
 
 
