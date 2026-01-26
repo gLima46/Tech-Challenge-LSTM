@@ -40,7 +40,7 @@ API_KEYS = set()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-model_path = os.path.join(BASE_DIR, "..", "Modelo", "modelo_lstm.h5")
+model_path = os.path.join(BASE_DIR, "..", "Modelo", "modelo_lstm.keras")
 scaler_path = os.path.join(BASE_DIR, "..", "Modelo", "scaler.pkl")
 
 model = load_model(model_path, custom_objects={"mse": MeanSquaredError()}, compile=False)
