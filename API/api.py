@@ -1,3 +1,11 @@
+import os
+
+# =========================
+# CONFIGURAÇÃO KERAS 3
+# =========================
+# Define o backend antes de importar o Keras
+os.environ["KERAS_BACKEND"] = "tensorflow"
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,9 +15,10 @@ import pandas as pd
 import joblib
 import time
 import logging
-import tensorflow as tf  # Alterado para importar o TF inteiro
 import secrets
-import os
+
+# Importação direta do Keras (padrão para TF 2.16+ / Keras 3)
+import keras 
 
 # =========================
 # LOGGING
@@ -49,7 +58,6 @@ API_KEYS = set()
 
 def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key not in API_KEYS:
-        # Dica: Em produção, você pode querer ter uma chave "mestra" fixa nas variáveis de ambiente
         raise HTTPException(
             status_code=401,
             detail="API Key inválida ou não registrada"
@@ -59,31 +67,38 @@ def verify_api_key(x_api_key: str = Header(...)):
 # CAMINHOS DOS ARQUIVOS
 # =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Ajuste os caminhos conforme a estrutura do seu container
+# Ajuste o caminho conforme sua estrutura no Docker
 model_path = os.path.join(BASE_DIR, "..", "Modelo", "modelo_lstm.h5")
 scaler_path = os.path.join(BASE_DIR, "..", "Modelo", "scaler.pkl")
 
 # =========================
 # LOAD MODEL & SCALER
 # =========================
+model = None
+scaler = None
+
 try:
-    # CORREÇÃO PRINCIPAL AQUI:
-    # 1. Usamos tf.keras.models.load_model para garantir o uso do TF interno
-    # 2. compile=False ignora erros de otimizadores e configs antigas (resolve o batch_shape)
-    logger.info(f"Carregando modelo de: {model_path}")
-    model = tf.keras.models.load_model(model_path, compile=False)
+    logger.info(f"Versão do Keras: {keras.__version__}")
+    logger.info(f"Tentando carregar modelo de: {model_path}")
     
-    logger.info(f"Carregando scaler de: {scaler_path}")
-    scaler = joblib.load(scaler_path)
-    logger.info("Modelo e Scaler carregados com sucesso.")
+    if os.path.exists(model_path):
+        # compile=False é CRUCIAL para evitar erros de otimizadores antigos
+        model = keras.models.load_model(model_path, compile=False)
+        logger.info("Modelo carregado com sucesso!")
+    else:
+        logger.error(f"ARQUIVO DE MODELO NÃO ENCONTRADO EM: {model_path}")
+
+    logger.info(f"Tentando carregar scaler de: {scaler_path}")
+    if os.path.exists(scaler_path):
+        scaler = joblib.load(scaler_path)
+        logger.info("Scaler carregado com sucesso!")
+    else:
+        logger.error(f"ARQUIVO DE SCALER NÃO ENCONTRADO EM: {scaler_path}")
 
 except Exception as e:
-    logger.error(f"Erro crítico ao carregar modelo ou scaler: {e}")
-    # Opcional: Impedir a API de iniciar se não houver modelo
-    # raise e 
-    model = None
-    scaler = None
+    logger.error(f"Erro CRÍTICO ao carregar recursos: {str(e)}")
+    # Não damos 'raise' aqui para a API subir e podermos ver os logs,
+    # mas os endpoints de previsão falharão de forma controlada.
 
 # =========================
 # MODELO DE ENTRADA
@@ -96,12 +111,15 @@ class PriceRequest(BaseModel):
 # =========================
 def predict_next_days(prices: np.ndarray, n_days: int):
     if model is None or scaler is None:
-        raise HTTPException(500, "Modelo não carregado no servidor.")
+        raise HTTPException(
+            status_code=500, 
+            detail="O modelo de IA não foi carregado corretamente no servidor. Verifique os logs."
+        )
 
     if len(prices) < TIME_STEPS:
         raise HTTPException(
             status_code=400,
-            detail=f"São necessários pelo menos {TIME_STEPS} preços"
+            detail=f"São necessários pelo menos {TIME_STEPS} preços históricos para realizar a previsão."
         )
 
     # Prepara os dados
@@ -133,8 +151,12 @@ def predict_next_days(prices: np.ndarray, n_days: int):
 # =========================
 @app.get("/")
 def health():
-    status_modelo = "Ativo" if model is not None else "Erro no carregamento"
-    return {"status": "API rodando", "modelo": status_modelo}
+    status_modelo = "Ativo" if model is not None else "INATIVO (Erro ao carregar)"
+    return {
+        "status": "API online", 
+        "modelo": status_modelo,
+        "keras_version": keras.__version__
+    }
 
 @app.post("/generate_api_key")
 def generate_api_key():
