@@ -10,6 +10,7 @@ import logging
 from tensorflow.keras.models import load_model
 from tensorflow.keras.losses import MeanSquaredError
 import secrets
+import os
 
 
 # LOGGING
@@ -37,8 +38,10 @@ app.add_middleware(
 
 API_KEYS = set()
 
-model_path = "../Modelo/modelo_lstm.h5"
-scaler_path = "../Modelo/scaler.pkl"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+model_path = os.path.join(BASE_DIR, "..", "Modelo", "modelo_lstm.h5")
+scaler_path = os.path.join(BASE_DIR, "..", "Modelo", "scaler.pkl")
 
 model = load_model(model_path, custom_objects={"mse": MeanSquaredError()})
 scaler = joblib.load(scaler_path)
