@@ -67,6 +67,7 @@ Controle de acesso via API Key
 🐳 Containerização
 A aplicação foi containerizada utilizando Docker, facilitando o deploy e a escalabilidade em ambientes de produção.
 
+https://tech-challenge-lstm.onrender.com/docs#/default/
 
 📦 Tecnologias Utilizadas
 Python
